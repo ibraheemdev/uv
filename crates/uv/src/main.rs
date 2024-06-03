@@ -669,7 +669,7 @@ fn main() -> ExitCode {
         // https://learn.microsoft.com/en-us/cpp/build/reference/stack-stack-allocations?view=msvc-170
         let stack_size = stack_size.parse().expect("Invalid stack size");
         let tokio_main = move || {
-            tokio::runtime::Builder::new_multi_thread()
+            tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .thread_stack_size(stack_size)
                 .build()
@@ -683,7 +683,7 @@ fn main() -> ExitCode {
             .join()
             .expect("Tokio executor failed, was there a panic?")
     } else {
-        tokio::runtime::Builder::new_multi_thread()
+        tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("Failed building the Runtime")

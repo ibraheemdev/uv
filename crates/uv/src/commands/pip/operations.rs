@@ -445,13 +445,14 @@ pub(crate) async fn install(
     }
 
     // Install the resolved distributions.
-    let wheels = wheels.into_iter().chain(cached).collect::<Vec<_>>();
+    let mut wheels = wheels.into_iter().chain(cached).collect::<Vec<_>>();
     if !wheels.is_empty() {
         let start = std::time::Instant::now();
-        uv_installer::Installer::new(venv)
+        wheels = uv_installer::Installer::new(venv)
             .with_link_mode(link_mode)
             .with_reporter(InstallReporter::from(printer).with_length(wheels.len() as u64))
-            .install(&wheels)?;
+            .install(wheels)
+            .await?;
 
         let s = if wheels.len() == 1 { "" } else { "s" };
         writeln!(

@@ -1,5 +1,8 @@
-use anyhow::{Context, Error, Result};
+use std::convert;
+
+use anyhow::{anyhow, Context, Error, Result};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use tokio::sync::oneshot;
 use tracing::instrument;
 
 use distribution_types::CachedDist;
@@ -48,11 +51,14 @@ impl<'a> Installer<'a> {
     }
 
     /// Install a set of wheels into a Python virtual environment.
+    ///
+    /// This method consumes and returns the `Vec` of wheels untouched.
     #[instrument(skip_all, fields(num_wheels = %wheels.len()))]
-    pub fn install(self, wheels: &[CachedDist]) -> Result<()> {
+    pub async fn install(self, wheels: Vec<CachedDist>) -> Result<Vec<CachedDist>> {
         let layout = self.venv.interpreter().layout();
-        tokio::task::block_in_place(|| {
-            wheels.par_iter().try_for_each(|wheel| {
+        let (tx, rx) = oneshot::channel();
+        rayon::spawn(move || {
+            let result = wheels.par_iter().try_for_each(|wheel| {
                 install_wheel_rs::linker::install_wheel(
                     &layout,
                     wheel.path(),
@@ -73,8 +79,12 @@ impl<'a> Installer<'a> {
                 }
 
                 Ok::<(), Error>(())
-            })
-        })
+            });
+
+            tx.send(result.map(|_| wheels)).unwrap();
+        });
+
+        rx.await.unwrap()
     }
 }
 
